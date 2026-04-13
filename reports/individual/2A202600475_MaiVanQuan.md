@@ -1,8 +1,8 @@
 # Báo Cáo Cá Nhân — Lab Day 08: RAG Pipeline
 
-**Họ và tên:** Thành viên 4  
+**Họ và tên:** Mai Văn Quân  
 **Vai trò trong nhóm:** Eval Owner — Variant & A/B Comparison  
-**Ngày nộp:** 2026-04-13  
+**Ngày nộp:** 13-04-2026  
 **Độ dài yêu cầu:** 500–800 từ
 
 ---
@@ -48,4 +48,4 @@ Dựa trên kết quả evaluation, tôi đề xuất hai cải tiến. Thứ nh
 
 ---
 
-*File: `reports/individual/thanh_vien_4.md`*
+*File: `reports/individual/2A202600475_MaiVanQuan.md`*
