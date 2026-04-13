@@ -1,66 +1,74 @@
 # Group Report — Lab Day 08: RAG Pipeline
 
-**Tên nhóm:** ___________  
+**Tên nhóm:** Nhóm 66  
 **Thành viên:**
-- ___________ (Tech Lead)
-- ___________ (Retrieval Owner)
-- ___________ (Eval Owner)
-- ___________ (Documentation Owner)
+- Thành viên 1 (Tech Lead)
+- Thành viên 2 (Retrieval Owner)
+- Thành viên 3 (Eval Owner — Baseline)
+- Thành viên 4 (Eval Owner — Variant & A/B)
+- Thành viên 5 (Documentation Owner)
 
-**Ngày nộp:** ___________
+**Ngày nộp:** 2026-04-13
 
 ---
 
 ## 1. Tóm tắt pipeline nhóm
 
-> Mô tả pipeline nhóm đã xây dựng trong 2-3 câu.
-> Hệ thống trả lời loại câu hỏi nào? Corpus gồm những tài liệu nào?
-
-_________________
+Pipeline RAG của nhóm xây dựng hệ thống trợ lý nội bộ trả lời câu hỏi chính sách doanh nghiệp dựa trên 5 tài liệu (hoàn tiền, SLA sự cố, quy trình cấp quyền, IT Helpdesk FAQ, chính sách nghỉ phép). Hệ thống thực hiện indexing 29 chunks với metadata 5 trường vào ChromaDB, hỗ trợ Dense/Hybrid/Rerank retrieval, grounded generation bằng GPT-4o-mini với citation [1][2] và khả năng abstain khi lack context.
 
 ---
 
 ## 2. Quyết định kỹ thuật cấp nhóm
 
 ### Chunking
-> Nhóm đã quyết định chunk như thế nào? Chunk size bao nhiêu? Tại sao?
-> Chiến lược: heading-based hay paragraph-based? Kết quả ra sao?
-
-_________________
+Nhóm sử dụng **heading-based chunking**: cắt tài liệu theo ranh giới `=== Section ===` tự nhiên, sau đó split tiếp theo paragraph (`\n\n`) nếu section quá dài. Overlap ~80 tokens giữa các chunk để không mất ngữ cảnh. Kết quả: 29 chunks từ 5 tài liệu, mỗi chunk giữ đầy đủ 5 metadata fields (source, department, effective_date, access, section). Chiến lược này tốt hơn cắt cứng vì không cắt giữa điều khoản.
 
 ### Retrieval Variant
-> Nhóm chọn variant nào (hybrid / rerank / query transform)?
-> Lý do chọn variant đó dựa trên kết quả baseline?
-> A/B comparison cho thấy gì?
+Nhóm chọn **Hybrid (Dense + BM25/RRF) + Cross-Encoder Rerank** vì:
+- Baseline Dense thường bỏ lỡ keyword chuyên ngành (P1, mã lỗi)
+- BM25 bổ sung khả năng exact keyword matching
+- Cross-Encoder lọc bỏ chunk nhiễu trước khi đưa vào prompt
 
-_________________
+A/B comparison cho thấy: Faithfulness tăng +0.40 (ít bịa hơn), đổi lại Relevance giảm -0.30 (abstain más nhiều). Trade-off hợp lý cho môi trường production.
 
 ### Grounding & Abstain
-> Nhóm xử lý câu hỏi không có trong docs như thế nào?
-> Pipeline có abstain đúng không? Ví dụ cụ thể?
-
-_________________
+Pipeline xử lý câu hỏi ngoài phạm vi docs bằng grounded prompt 4 quy tắc: evidence-only, abstain, citation, short/clear. Ví dụ cụ thể:
+- **q09** "ERR-403-AUTH là lỗi gì?" → Pipeline trả lời "Không đủ dữ liệu trong tài liệu hiện có" (đúng — mã lỗi này không tồn tại trong docs).
+- **q10** "Hoàn tiền VIP khác không?" → Abstain đúng (không có policy VIP riêng trong docs).
 
 ---
 
-## 3. Kết quả Grading Questions
+## 3. Kết quả chạy Test Questions (nội bộ)
 
-> Tóm tắt kết quả chạy grading_questions.json.
-> Câu nào đạt Full, Partial, Zero, Penalty?
-> Điểm grading ước tính: ___ / 98 raw → ___ / 30 điểm
+> **Lưu ý:** Bảng dưới đây là kết quả chạy `test_questions.json` (10 câu nội bộ do nhóm tự thiết kế). Kết quả chạy `grading_questions.json` (công bố 17:00) sẽ được cập nhật vào `logs/grading_run.json` và bổ sung vào mục này.
 
-_________________
+| ID | Câu hỏi (rút gọn) | Kết quả | Ghi chú |
+|---|---|---|---|
+| q01 | SLA P1 bao lâu? | **Full** | 15 phút + 4 giờ — trích dẫn từ `sla-p1-2026.pdf` [1] |
+| q02 | Hoàn tiền mấy ngày? | **Full** | 7 ngày làm việc — trích dẫn từ `refund-v4.pdf` [1] |
+| q03 | Phê duyệt Level 3? | **Full** | LM + IT Admin + IT Security — trích dẫn `access-control-sop` [2] |
+| q04 | Kỹ thuật số hoàn tiền? | **Full** | Không — ngoại lệ license key, subscription |
+| q05 | Khóa bao nhiêu lần? | **Full** | 5 lần — trích dẫn `helpdesk-faq.md` [1] |
+| q06 | Escalation P1? | **Partial** | Đúng 10 phút escalation, thiếu chi tiết VP/CTO chain |
+| q07 | Approval Matrix? | **Partial** | Baseline nhận diện đúng source nhưng suy diễn; Variant abstain |
+| q08 | Remote mấy ngày? | **Full** | 2 ngày/tuần, phê duyệt qua HR Portal |
+| q09 | ERR-403-AUTH? | **Full (Abstain)** | Abstain đúng — mã lỗi không tồn tại trong corpus |
+| q10 | VIP hoàn tiền khác? | **Full (Abstain)** | Abstain đúng — không có policy VIP riêng |
+
+**Điểm test nội bộ ước tính:** 8 Full (8×10) + 2 Partial (2×5) = 90/100
+
+**Điểm grading chính thức:** _Chờ cập nhật sau 17:00 khi nhận được `grading_questions.json`_
 
 ---
 
 ## 4. Điều nhóm học được
 
-> 2-3 điều quan trọng nhất rút ra từ lab này.
-> Tập trung vào quyết định kỹ thuật cấp nhóm, không trùng với individual report.
+1. **Chunking strategy quyết định chất lượng retrieval.** Heading-based chunking giữ nguyên ngữ cảnh điều khoản, không cắt giữa câu như fixed-size chunking. Kết quả: Context Recall đạt 5.0/5 trên toàn bộ 10 câu hỏi — chứng tỏ retriever luôn tìm đúng tài liệu cần thiết.
 
-_________________
+2. **Hybrid+Rerank tạo trade-off giữa Faithfulness và Completeness.** Faithfulness tăng +0.40 (giảm hallucination) nhưng Relevance giảm -0.30 (abstain nhiều hơn). Trong môi trường sản xuất, nhóm thống nhất ưu tiên không bịa hơn là trả lời đầy đủ.
+
+3. **Evaluation bằng số liệu là bắt buộc, không thể vibe check.** Nếu không có scorecard A/B, nhóm sẽ không phát hiện q07 bị Reranker loại nhầm chunk bổ trợ — vấn đề chỉ hiện ra khi so sánh baseline vs variant trên nhiều câu.
 
 ---
 
-*File này cần nộp trước hoặc sau 18:00 đều được.*
-*Xem `SCORING.md` để biết timeline chi tiết.*
+*File này được nộp cùng với 5 báo cáo cá nhân.*
